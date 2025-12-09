@@ -23,34 +23,34 @@ def test_imports():
     print("\n1. Testing standard dependencies...")
     try:
         import torch
-        print(f"  ✓ torch {torch.__version__}")
+        print(f"   torch {torch.__version__}")
         tests.append(True)
     except Exception as e:
-        print(f"  ✗ torch: {e}")
+        print(f"   torch: {e}")
         tests.append(False)
     
     try:
         import numpy as np
-        print(f"  ✓ numpy {np.__version__}")
+        print(f"   numpy {np.__version__}")
         tests.append(True)
     except Exception as e:
-        print(f"  ✗ numpy: {e}")
+        print(f"   numpy: {e}")
         tests.append(False)
     
     try:
         import cv2
-        print(f"  ✓ opencv {cv2.__version__}")
+        print(f"   opencv {cv2.__version__}")
         tests.append(True)
     except Exception as e:
-        print(f"  ✗ opencv: {e}")
+        print(f"   opencv: {e}")
         tests.append(False)
     
     try:
         import smplx
-        print(f"  ✓ smplx {smplx.__version__}")
+        print(f"   smplx {smplx.__version__}")
         tests.append(True)
     except Exception as e:
-        print(f"  ✗ smplx: {e}")
+        print(f"   smplx: {e}")
         tests.append(False)
     
     # Test SPIN modules
@@ -61,36 +61,36 @@ def test_imports():
     
     try:
         from models import hmr
-        print("  ✓ SPIN HMR model")
+        print("   SPIN HMR model")
         tests.append(True)
     except Exception as e:
-        print(f"  ✗ SPIN HMR: {e}")
+        print(f"   SPIN HMR: {e}")
         tests.append(False)
         return False
     
     try:
         from models import SMPL
-        print("  ✓ SPIN SMPL model")
+        print("   SPIN SMPL model")
         tests.append(True)
     except Exception as e:
-        print(f"  ✗ SPIN SMPL: {e}")
+        print(f"   SPIN SMPL: {e}")
         tests.append(False)
         return False
     
     try:
         import constants as spin_constants
-        print("  ✓ SPIN constants")
+        print("   SPIN constants")
         tests.append(True)
     except Exception as e:
-        print(f"  ✗ SPIN constants: {e}")
+        print(f"   SPIN constants: {e}")
         tests.append(False)
     
     try:
         import config as spin_config
-        print("  ✓ SPIN config")
+        print("   SPIN config")
         tests.append(True)
     except Exception as e:
-        print(f"  ✗ SPIN config: {e}")
+        print(f"   SPIN config: {e}")
         tests.append(False)
     
     return all(tests)
@@ -119,21 +119,21 @@ def test_spin_initialization():
         smpl_mean_params = spin_config.SMPL_MEAN_PARAMS
         
         if not os.path.exists(smpl_mean_params):
-            print(f"  ✗ SMPL mean params not found: {smpl_mean_params}")
+            print(f"   SMPL mean params not found: {smpl_mean_params}")
             return False
         
         model = hmr(smpl_mean_params)
-        print(f"  ✓ HMR model created")
+        print(f"   HMR model created")
         
         # Test loading checkpoint
         print("\n2. Checking model checkpoint...")
         checkpoint_path = "data/model_checkpoint.pt"
         
         if not os.path.exists(checkpoint_path):
-            print(f"  ✗ Checkpoint not found: {checkpoint_path}")
+            print(f"   Checkpoint not found: {checkpoint_path}")
             return False
         
-        print(f"  ✓ Checkpoint exists ({os.path.getsize(checkpoint_path) / 1024 / 1024:.1f} MB)")
+        print(f"   Checkpoint exists ({os.path.getsize(checkpoint_path) / 1024 / 1024:.1f} MB)")
         
         # Test SMPL model
         print("\n3. Initializing SMPL model...")
@@ -141,17 +141,17 @@ def test_spin_initialization():
         smpl_model_dir = spin_config.SMPL_MODEL_DIR
         
         if not os.path.exists(smpl_model_dir):
-            print(f"  ✗ SMPL model dir not found: {smpl_model_dir}")
+            print(f"   SMPL model dir not found: {smpl_model_dir}")
             return False
         
         smpl = SMPL(smpl_model_dir, batch_size=1, create_transl=False)
-        print(f"  ✓ SMPL model initialized")
-        print(f"  ✓ SMPL faces shape: {smpl.faces.shape}")
+        print(f"   SMPL model initialized")
+        print(f"   SMPL faces shape: {smpl.faces.shape}")
         
         return True
         
     except Exception as e:
-        print(f"  ✗ Error: {e}")
+        print(f"   Error: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -181,16 +181,16 @@ def test_spin_wrapper():
         
         print("\n1. Initializing SpinModelWrapper...")
         wrapper = SpinModelWrapper(project_config.SPIN_ROOT)
-        print("  ✓ Wrapper initialized successfully")
-        print(f"  ✓ Device: {wrapper.device}")
-        print(f"  ✓ Model loaded: {wrapper.model is not None}")
-        print(f"  ✓ SMPL loaded: {wrapper.smpl is not None}")
-        print(f"  ✓ Faces shape: {wrapper.faces.shape if wrapper.faces is not None else 'None'}")
+        print("   Wrapper initialized successfully")
+        print(f"   Device: {wrapper.device}")
+        print(f"   Model loaded: {wrapper.model is not None}")
+        print(f"   SMPL loaded: {wrapper.smpl is not None}")
+        print(f"   Faces shape: {wrapper.faces.shape if wrapper.faces is not None else 'None'}")
         
         return True
         
     except Exception as e:
-        print(f"  ✗ Error: {e}")
+        print(f"   Error: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -226,7 +226,7 @@ def main():
     print("=" * 60)
     
     for name, passed in results:
-        status = "✓ PASS" if passed else "✗ FAIL"
+        status = " PASS" if passed else " FAIL"
         print(f"{status}: {name}")
     
     all_passed = all(r[1] for r in results)
@@ -240,7 +240,7 @@ def main():
         print("  streamlit run app.py")
         return 0
     else:
-        print("❌ SOME TESTS FAILED")
+        print(" SOME TESTS FAILED")
         print("=" * 60)
         print("\nPlease review the errors above.")
         print("See COMPATIBILITY_FIXES.md for troubleshooting.")

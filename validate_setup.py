@@ -17,7 +17,7 @@ BLUE = '\033[94m'
 RESET = '\033[0m'
 
 def check_mark(condition):
-    return f"{GREEN}✓{RESET}" if condition else f"{RED}✗{RESET}"
+    return f"{GREEN}{RESET}" if condition else f"{RED}{RESET}"
 
 def print_header(text):
     print(f"\n{BLUE}{'=' * 60}{RESET}")

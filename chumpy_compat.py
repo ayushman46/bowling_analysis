@@ -16,7 +16,7 @@ def patch_environment():
     # Patch 1: inspect.getargspec → inspect.getfullargspec (removed in Python 3.11+)
     if not hasattr(inspect, 'getargspec'):
         inspect.getargspec = inspect.getfullargspec
-        print("✓ Patched inspect.getargspec")
+        print(" Patched inspect.getargspec")
     
     # Patch 2: numpy type aliases (removed in numpy 1.20+)
     # Chumpy tries: from numpy import bool, int, float, complex, object, unicode, str
@@ -35,7 +35,7 @@ def patch_environment():
     if not hasattr(np, 'str'):
         np.str = np.str_
     
-    print("✓ Patched numpy type aliases")
+    print(" Patched numpy type aliases")
 
 # Apply patches immediately when this module is imported
 patch_environment()

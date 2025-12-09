@@ -28,7 +28,7 @@ from PIL import Image
 from app_config import make_run_dir, SPIN_ROOT
 from src.ingestion.video_utils import save_uploaded_video, extract_frames
 from src.reconstruction.spin_wrapper import SpinModelWrapper
-from src.analysis.metrics import compute_bowling_metrics
+from src.analysis.metrics import compute_bowling_metrics, compute_bowling_metrics_from_mediapipe
 from src.visualization.render_utils import (
     draw_2d_skeleton_on_frame,
     make_plotly_mesh_figure,
@@ -222,7 +222,7 @@ def run_ultra_accurate_pose(frame_bgr: np.ndarray) -> Optional[Dict]:
                         0.8
                     )
                     
-                    print("✓ Head landmarks refined with Face Mesh")
+                    print("[OK] Head landmarks refined with Face Mesh")
                     
         except Exception as e:
             # Face detection failed, keep original landmarks
@@ -436,20 +436,20 @@ def reset_session():
 def main():
     st.set_page_config(
         page_title="Cricket Bowling 3D Analysis",
-        page_icon="🏏",
+        page_icon="",
         layout="wide",
     )
     
     init_session_state()
     
-    st.title("🏏 Cricket Bowling 3D Analysis (High Accuracy Mode)")
+    st.title(" Cricket Bowling 3D Analysis (High Accuracy Mode)")
     st.markdown("""
     **New Frame-First Workflow for Maximum Accuracy:**
     1. 📹 Upload video → frames are extracted
     2. 🎯 **You select the exact frame** you want to analyze
-    3. 🔬 Run **ULTRA-HIGH-ACCURACY** pose detection on that one frame
+    3.  Run **ULTRA-HIGH-ACCURACY** pose detection on that one frame
     4. 🧍 Generate precise 3D body mesh
-    5. 📊 View metrics and download results
+    5.  View metrics and download results
     """)
     
     st.divider()
@@ -498,7 +498,7 @@ def main():
             st.session_state.timestamps = timestamps
             st.session_state.fps = fps
             
-            st.success(f"✅ Extracted {len(frames)} frames at {fps:.1f} FPS")
+            st.success(f"Extracted {len(frames)} frames at {fps:.1f} FPS")
     
     frames = st.session_state.frames
     frame_indices = st.session_state.frame_indices
@@ -559,15 +559,15 @@ def main():
     # -------------------------------------------------------------------------
     st.subheader("Step 2: Run High-Accuracy Pose Detection")
     
-    if st.button("🔬 Analyze This Frame (Ultra-High Accuracy)", type="primary"):
-        with st.spinner("Running ULTRA-HIGH-ACCURACY pose detection... (8 preprocessing variants × 3 scales)"):
+    if st.button("Analyze This Frame (Ultra-High Accuracy)", type="primary"):
+        with st.spinner("Running ULTRA-HIGH-ACCURACY pose detection... (8 preprocessing variants x 3 scales)"):
             accurate_pose = run_ultra_accurate_pose(current_frame)
             st.session_state.accurate_pose = accurate_pose
             
             if accurate_pose:
-                st.success("✅ High-accuracy pose detected!")
+                st.success("High-accuracy pose detected!")
             else:
-                st.error("❌ Could not detect pose. Try a different frame with clearer view of the bowler.")
+                st.error("Could not detect pose. Try a different frame with clearer view of the bowler.")
         st.rerun()
     
     # Display pose if we have one
@@ -584,7 +584,7 @@ def main():
             st.image(frame_skeleton_rgb, caption="High-Accuracy 2D Skeleton", use_container_width=True)
         
         with col_info:
-            st.success("✓ Ultra-High-Accuracy Pose")
+            st.success("Ultra-High-Accuracy Pose")
             st.markdown("**Key Joint Positions:**")
             for name in ["NOSE", "RIGHT_SHOULDER", "RIGHT_ELBOW", "RIGHT_WRIST", 
                         "LEFT_SHOULDER", "LEFT_ELBOW", "LEFT_WRIST"]:
@@ -690,16 +690,17 @@ def run_3d_analysis(frame_idx: int, pose: Dict):
         result = spin_model.run(frame_rgb)
         
         if result.get("optimization_applied"):
-            st.success("✅ Applied 2D keypoint optimization to align 3D mesh with detected pose")
+            st.success("Applied 2D keypoint optimization to align 3D mesh with detected pose")
         
         vertices = result["vertices"]
         faces = result["faces"]
         joints_3d = result["joints_3d"]
         smpl_params = result["smpl_params"]
         
-        progress.progress(60, text="Computing biomechanics metrics...")
+        progress.progress(60, text="Computing biomechanics metrics from MediaPipe...")
         
-        metrics = compute_bowling_metrics(joints_3d, scale_info=None, right_handed=True)
+        # Use MediaPipe 2D landmarks for accurate metrics (not SPIN 3D which can be misaligned)
+        metrics = compute_bowling_metrics_from_mediapipe(adjusted_pose, right_handed=True)
         
         progress.progress(80, text="Saving results...")
         
@@ -733,7 +734,7 @@ def run_3d_analysis(frame_idx: int, pose: Dict):
         }
         st.session_state.analysis_done = True
         
-        st.success("✅ 3D mesh generated successfully!")
+        st.success("3D mesh generated successfully!")
         st.rerun()
         
     except Exception as e:
@@ -749,7 +750,7 @@ def display_analysis_results():
     metrics = results["metrics"]
     
     st.divider()
-    st.header("📊 Cricket Bowling Analysis Report")
+    st.header(" Cricket Bowling Analysis Report")
     
     # =========================================================================
     # SECTION 1: ACTION LEGALITY (Most Important for Cricket)
@@ -763,16 +764,16 @@ def display_analysis_results():
     
     # Color-coded legality display
     if legality_status == "LEGAL":
-        st.success(f"✅ **{legality_status}** - Elbow Extension: {arm_flexion:.1f}°")
+        st.success(f"**{legality_status}** - Elbow Extension: {arm_flexion:.1f}")
     elif legality_status == "BORDERLINE":
-        st.warning(f"⚠️ **{legality_status}** - Elbow Extension: {arm_flexion:.1f}°")
+        st.warning(f"**{legality_status}** - Elbow Extension: {arm_flexion:.1f}")
     elif legality_status == "SUSPICIOUS":
-        st.warning(f"🔶 **{legality_status}** - Elbow Extension: {arm_flexion:.1f}°")
+        st.warning(f"**{legality_status}** - Elbow Extension: {arm_flexion:.1f}")
     else:
-        st.error(f"❌ **{legality_status}** - Elbow Extension: {arm_flexion:.1f}°")
+        st.error(f"**{legality_status}** - Elbow Extension: {arm_flexion:.1f}")
     
     st.caption(legality_detail)
-    st.caption("*ICC allows up to 15° elbow extension during delivery*")
+    st.caption("*ICC allows up to 15 degrees elbow extension during delivery*")
     
     st.divider()
     
@@ -813,7 +814,7 @@ def display_analysis_results():
         st.caption(grade_detail)
         
         # Bowling type guess
-        st.markdown("### 🏏 Bowling Type")
+        st.markdown("###  Bowling Type")
         bowling_type = metrics.get("bowling_type_guess", "UNDETERMINED")
         type_confidence = metrics.get("type_confidence", "LOW")
         type_detail = metrics.get("type_detail", "")
@@ -837,19 +838,19 @@ def display_analysis_results():
         with col1:
             st.metric(
                 "Elbow Angle",
-                f"{metrics.get('elbow_angle_deg', 0):.1f}°",
-                help="Angle at the elbow joint. ~180° = fully extended"
+                f"{metrics.get('elbow_angle_deg', 0):.1f}deg",
+                help="Angle at the elbow joint. ~180deg = fully extended"
             )
             st.metric(
                 "Arm Flexion",
-                f"{metrics.get('arm_flexion_deg', 0):.1f}°",
+                f"{metrics.get('arm_flexion_deg', 0):.1f}deg",
                 help="How bent the arm is from fully straight"
             )
         
         with col2:
             st.metric(
                 "Shoulder Abduction",
-                f"{metrics.get('shoulder_abduction_deg', 0):.1f}°",
+                f"{metrics.get('shoulder_abduction_deg', 0):.1f}deg",
                 help="Angle of arm away from body"
             )
             arm_pos = metrics.get("arm_position", "UNKNOWN")
@@ -858,7 +859,7 @@ def display_analysis_results():
         with col3:
             st.metric(
                 "Forearm Angle",
-                f"{metrics.get('forearm_angle_deg', 0):.1f}°",
+                f"{metrics.get('forearm_angle_deg', 0):.1f}deg",
                 help="Angle between upper arm and forearm"
             )
             front_arm = metrics.get("front_arm_status", "UNKNOWN")
@@ -873,7 +874,7 @@ def display_analysis_results():
         with col1:
             st.metric(
                 "Spine Tilt",
-                f"{metrics.get('spine_tilt_deg', 0):.1f}°",
+                f"{metrics.get('spine_tilt_deg', 0):.1f}deg",
                 help="Forward/backward lean of the torso"
             )
             spine_status = metrics.get("spine_status", "UNKNOWN")
@@ -882,15 +883,15 @@ def display_analysis_results():
         with col2:
             st.metric(
                 "Hip-Shoulder Separation",
-                f"{metrics.get('hip_shoulder_separation_deg', 0):.1f}°",
+                f"{metrics.get('hip_shoulder_separation_deg', 0):.1f}deg",
                 help="Rotation difference between hips and shoulders"
             )
-            st.caption("*25-45° is optimal for pace bowling*")
+            st.caption("*25-45deg is optimal for pace bowling*")
         
         with col3:
             st.metric(
                 "Shoulder Tilt",
-                f"{metrics.get('shoulder_tilt_deg', 0):.1f}°",
+                f"{metrics.get('shoulder_tilt_deg', 0):.1f}deg",
                 help="How level the shoulders are"
             )
             action_type = metrics.get("action_type", "UNKNOWN")
@@ -913,8 +914,8 @@ def display_analysis_results():
         with col2:
             st.metric(
                 "Arm Angle from Vertical",
-                f"{metrics.get('arm_angle_from_vertical_deg', 0):.1f}°",
-                help="0° = straight up, 90° = horizontal"
+                f"{metrics.get('arm_angle_from_vertical_deg', 0):.1f}deg",
+                help="0deg = straight up, 90deg = horizontal"
             )
         
         st.caption(metrics.get("release_detail", ""))
@@ -927,36 +928,36 @@ def display_analysis_results():
     # =========================================================================
     # SECTION 4: COACHING INSIGHTS
     # =========================================================================
-    st.subheader("💡 Coaching Insights")
+    st.subheader(" Coaching Insights")
     
     insights = []
     
     # Legality insights
     if legality_status == "LEGAL":
-        insights.append("✅ **Elbow action is legal** - Arm extension within ICC limits")
+        insights.append(" **Elbow action is legal** - Arm extension within ICC limits")
     elif legality_status in ["BORDERLINE", "SUSPICIOUS"]:
-        insights.append("⚠️ **Elbow action needs attention** - Consider biomechanics testing")
+        insights.append(" **Elbow action needs attention** - Consider biomechanics testing")
     
     # Hip-shoulder separation
     hip_sep = metrics.get("hip_shoulder_separation_deg", 0)
     if hip_sep < 20:
         insights.append("� **Chest-on action** - Good for spin, may limit pace bowling speed")
     elif hip_sep > 45:
-        insights.append("📐 **Strong side-on action** - Good for pace, watch for back stress")
+        insights.append(" **Strong side-on action** - Good for pace, watch for back stress")
     else:
-        insights.append("✓ **Good hip-shoulder separation** - Balanced action")
+        insights.append(" **Good hip-shoulder separation** - Balanced action")
     
     # Release point
     release = metrics.get("release_position", "")
     if release == "HIGH":
-        insights.append("⬆️ **High release point** - Good for pace and bounce")
+        insights.append(" **High release point** - Good for pace and bounce")
     elif release == "LOW":
-        insights.append("⬇️ **Low release point** - Watch arm position at delivery")
+        insights.append(" **Low release point** - Watch arm position at delivery")
     
     # Front arm
     front_arm = metrics.get("front_arm_status", "")
     if front_arm == "HIGH":
-        insights.append("🙆 **Front arm high** - Good balance and pull-down potential")
+        insights.append(" **Front arm high** - Good balance and pull-down potential")
     elif front_arm == "LOW":
         insights.append("💪 **Front arm pulled down** - Generating body rotation")
     

@@ -82,10 +82,10 @@ pip install tensorboard
 ```
 
 **Important:** Some packages in `spin_src/requirements.txt` are incompatible with Python 3.12 or only needed for training:
-- ❌ `chumpy` - Python 3.11+ incompatible, training-only
-- ❌ `neural-renderer-pytorch` - Build issues, training-only  
-- ❌ `torchgeometry` - Deprecated, training-only
-- ❌ `spacepy` - Dataset preprocessing only
+-  `chumpy` - Python 3.11+ incompatible, training-only
+-  `neural-renderer-pytorch` - Build issues, training-only  
+-  `torchgeometry` - Deprecated, training-only
+-  `spacepy` - Dataset preprocessing only
 
 **All compatibility issues have been resolved!** See `COMPATIBILITY_FIXES.md` for details.
 

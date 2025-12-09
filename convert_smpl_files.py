@@ -81,7 +81,7 @@ def convert_smpl_file(input_path, output_path=None):
     with open(output_path, 'wb') as f:
         pickle.dump(converted_data, f, protocol=2)
     
-    print(f"  ✓ Converted successfully")
+    print(f"   Converted successfully")
 
 
 def main():
@@ -120,7 +120,7 @@ def main():
     
     print()
     print("=" * 60)
-    print("✓ All SMPL files converted successfully!")
+    print(" All SMPL files converted successfully!")
     print("=" * 60)
     print()
     print("The SMPL files have been converted to numpy format.")

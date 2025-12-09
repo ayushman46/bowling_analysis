@@ -524,3 +524,306 @@ def save_metrics(metrics_dict: Dict[str, Any], output_path: str) -> None:
     
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(metrics_dict, f, indent=2)
+
+
+def compute_2d_angle(p1: Tuple[float, float], p2: Tuple[float, float], p3: Tuple[float, float]) -> float:
+    """
+    Compute angle at p2 formed by p1-p2-p3 in 2D (degrees).
+    p1, p2, p3 are (x, y) tuples.
+    """
+    v1 = np.array([p1[0] - p2[0], p1[1] - p2[1]])
+    v2 = np.array([p3[0] - p2[0], p3[1] - p2[1]])
+    
+    v1_norm = v1 / (np.linalg.norm(v1) + 1e-8)
+    v2_norm = v2 / (np.linalg.norm(v2) + 1e-8)
+    
+    dot = np.clip(np.dot(v1_norm, v2_norm), -1.0, 1.0)
+    angle_rad = np.arccos(dot)
+    return float(np.degrees(angle_rad))
+
+
+def compute_bowling_metrics_from_mediapipe(
+    pose_landmarks: Dict[str, Tuple[float, float, float]],
+    right_handed: bool = True,
+) -> Dict[str, Any]:
+    """
+    Compute cricket bowling metrics from MediaPipe 2D pose landmarks.
+    This uses the accurate 2D detection instead of SPIN 3D estimation.
+    
+    Args:
+        pose_landmarks: Dict mapping landmark names to (x, y, visibility)
+        right_handed: Whether bowler is right-handed
+    
+    Returns:
+        Dictionary with all cricket-specific metrics
+    """
+    metrics = {}
+    
+    # Helper to get point as (x, y) or None
+    def get_point(name: str) -> Tuple[float, float] | None:
+        if name in pose_landmarks:
+            x, y, vis = pose_landmarks[name]
+            if vis > 0.3:
+                return (x, y)
+        return None
+    
+    # Get key landmarks
+    left_shoulder = get_point("LEFT_SHOULDER")
+    right_shoulder = get_point("RIGHT_SHOULDER")
+    left_elbow = get_point("LEFT_ELBOW")
+    right_elbow = get_point("RIGHT_ELBOW")
+    left_wrist = get_point("LEFT_WRIST")
+    right_wrist = get_point("RIGHT_WRIST")
+    left_hip = get_point("LEFT_HIP")
+    right_hip = get_point("RIGHT_HIP")
+    left_knee = get_point("LEFT_KNEE")
+    right_knee = get_point("RIGHT_KNEE")
+    left_ankle = get_point("LEFT_ANKLE")
+    right_ankle = get_point("RIGHT_ANKLE")
+    nose = get_point("NOSE")
+    
+    # Set bowling arm based on handedness
+    if right_handed:
+        bowl_shoulder = right_shoulder
+        bowl_elbow = right_elbow
+        bowl_wrist = right_wrist
+        front_shoulder = left_shoulder
+        front_elbow = left_elbow
+        front_wrist = left_wrist
+    else:
+        bowl_shoulder = left_shoulder
+        bowl_elbow = left_elbow
+        bowl_wrist = left_wrist
+        front_shoulder = right_shoulder
+        front_elbow = right_elbow
+        front_wrist = right_wrist
+    
+    # ========== ELBOW ANGLE (Critical for legality) ==========
+    if bowl_shoulder and bowl_elbow and bowl_wrist:
+        elbow_angle = compute_2d_angle(bowl_shoulder, bowl_elbow, bowl_wrist)
+        arm_flexion = 180.0 - elbow_angle
+        
+        # ICC legality assessment
+        if arm_flexion <= 15:
+            legality_status = "LEGAL"
+            legality_detail = "Elbow extension within ICC 15° limit"
+            legality_color = "green"
+        elif arm_flexion <= 20:
+            legality_status = "BORDERLINE"
+            legality_detail = "Elbow extension 15-20° - may require review"
+            legality_color = "yellow"
+        elif arm_flexion <= 25:
+            legality_status = "SUSPICIOUS"
+            legality_detail = "Elbow extension 20-25° - needs official review"
+            legality_color = "orange"
+        else:
+            legality_status = "ILLEGAL"
+            legality_detail = f"Elbow extension {arm_flexion:.1f}° exceeds limits"
+            legality_color = "red"
+        
+        metrics["elbow_angle_deg"] = float(elbow_angle)
+        metrics["arm_flexion_deg"] = float(arm_flexion)
+        metrics["legality_status"] = legality_status
+        metrics["legality_detail"] = legality_detail
+        metrics["legality_color"] = legality_color
+    else:
+        metrics["elbow_angle_deg"] = None
+        metrics["legality_status"] = "UNKNOWN"
+        metrics["legality_detail"] = "Bowling arm not fully visible"
+        metrics["legality_color"] = "gray"
+    
+    # ========== RELEASE POINT ==========
+    if bowl_shoulder and bowl_wrist:
+        # Check if wrist is above shoulder (y-axis: lower y = higher position)
+        wrist_above = bowl_wrist[1] < bowl_shoulder[1]
+        height_diff = bowl_shoulder[1] - bowl_wrist[1]  # Positive = wrist above
+        
+        if left_shoulder and right_shoulder:
+            shoulder_width = abs(left_shoulder[0] - right_shoulder[0])
+            relative_height = height_diff / (shoulder_width + 1e-8)
+            metrics["release_height_relative"] = float(relative_height)
+        
+        if wrist_above and height_diff > 50:
+            metrics["release_position"] = "HIGH"
+            metrics["release_detail"] = "Arm raised high - classic pace action"
+        elif wrist_above:
+            metrics["release_position"] = "SHOULDER_HEIGHT"
+            metrics["release_detail"] = "Arm at shoulder level"
+        else:
+            metrics["release_position"] = "LOW"
+            metrics["release_detail"] = "Arm below shoulder - spin or roundarm"
+    
+    # ========== ARM ANGLE FROM VERTICAL ==========
+    if bowl_shoulder and bowl_wrist:
+        arm_vec = (bowl_wrist[0] - bowl_shoulder[0], bowl_wrist[1] - bowl_shoulder[1])
+        vertical = (0, -1)  # Up in image coordinates
+        
+        # Angle from vertical
+        arm_len = np.sqrt(arm_vec[0]**2 + arm_vec[1]**2) + 1e-8
+        arm_norm = (arm_vec[0] / arm_len, arm_vec[1] / arm_len)
+        
+        dot = arm_norm[0] * vertical[0] + arm_norm[1] * vertical[1]
+        angle_from_vertical = np.degrees(np.arccos(np.clip(dot, -1, 1)))
+        metrics["arm_angle_from_vertical_deg"] = float(angle_from_vertical)
+    
+    # ========== FRONT ARM ANALYSIS ==========
+    if front_shoulder and front_elbow and front_wrist:
+        front_elbow_angle = compute_2d_angle(front_shoulder, front_elbow, front_wrist)
+        metrics["front_elbow_angle_deg"] = float(front_elbow_angle)
+        
+        if front_elbow_angle > 160:
+            metrics["front_arm_style"] = "EXTENDED"
+            metrics["front_arm_detail"] = "Front arm fully extended - good drive"
+        elif front_elbow_angle > 120:
+            metrics["front_arm_style"] = "SEMI_BENT"
+            metrics["front_arm_detail"] = "Front arm partially bent"
+        else:
+            metrics["front_arm_style"] = "BENT"
+            metrics["front_arm_detail"] = "Front arm bent - may limit rotation"
+    
+    # ========== SHOULDER ALIGNMENT ==========
+    if left_shoulder and right_shoulder:
+        shoulder_slope = (right_shoulder[1] - left_shoulder[1]) / (
+            abs(right_shoulder[0] - left_shoulder[0]) + 1e-8
+        )
+        shoulder_tilt_deg = np.degrees(np.arctan(abs(shoulder_slope)))
+        
+        metrics["shoulder_tilt_deg"] = float(shoulder_tilt_deg)
+        
+        if shoulder_tilt_deg < 10:
+            metrics["shoulder_alignment"] = "LEVEL"
+            metrics["shoulder_detail"] = "Shoulders level - balanced action"
+        elif shoulder_tilt_deg < 25:
+            metrics["shoulder_alignment"] = "TILTED"
+            metrics["shoulder_detail"] = "Moderate shoulder tilt - common in pace bowling"
+        else:
+            metrics["shoulder_alignment"] = "HEAVILY_TILTED"
+            metrics["shoulder_detail"] = "Significant shoulder drop - may cause strain"
+    
+    # ========== HIP-SHOULDER SEPARATION ==========
+    if left_shoulder and right_shoulder and left_hip and right_hip:
+        # Shoulder line angle
+        shoulder_angle = np.degrees(np.arctan2(
+            right_shoulder[1] - left_shoulder[1],
+            right_shoulder[0] - left_shoulder[0]
+        ))
+        
+        # Hip line angle
+        hip_angle = np.degrees(np.arctan2(
+            right_hip[1] - left_hip[1],
+            right_hip[0] - left_hip[0]
+        ))
+        
+        separation = abs(shoulder_angle - hip_angle)
+        if separation > 180:
+            separation = 360 - separation
+        
+        metrics["hip_shoulder_separation_deg"] = float(separation)
+        
+        if separation > 30:
+            metrics["action_type"] = "SIDE_ON"
+            metrics["action_detail"] = "Strong side-on action - good hip-shoulder separation"
+        elif separation > 15:
+            metrics["action_type"] = "SEMI_OPEN"
+            metrics["action_detail"] = "Semi-open action - mixed technique"
+        else:
+            metrics["action_type"] = "CHEST_ON"
+            metrics["action_detail"] = "Chest-on action - common in modern pace bowling"
+    
+    # ========== KNEE DRIVE (Front leg) ==========
+    if right_handed:
+        front_hip = left_hip
+        front_knee = left_knee
+        front_ankle = left_ankle
+    else:
+        front_hip = right_hip
+        front_knee = right_knee
+        front_ankle = right_ankle
+    
+    if front_hip and front_knee and front_ankle:
+        front_knee_angle = compute_2d_angle(front_hip, front_knee, front_ankle)
+        metrics["front_knee_angle_deg"] = float(front_knee_angle)
+        
+        if front_knee_angle > 170:
+            metrics["front_leg_style"] = "BRACED"
+            metrics["front_leg_detail"] = "Front leg braced - strong base for pace"
+        elif front_knee_angle > 140:
+            metrics["front_leg_style"] = "SEMI_BRACED"
+            metrics["front_leg_detail"] = "Front leg semi-braced"
+        else:
+            metrics["front_leg_style"] = "BENT"
+            metrics["front_leg_detail"] = "Front leg bent - may reduce pace"
+    
+    # ========== BOWLING TYPE CLASSIFICATION ==========
+    if metrics.get("release_position") == "HIGH" and metrics.get("action_type") in ["SIDE_ON", "SEMI_OPEN"]:
+        metrics["bowling_type"] = "PACE"
+        metrics["bowling_type_detail"] = "Action consistent with pace bowling"
+    elif metrics.get("release_position") == "LOW":
+        metrics["bowling_type"] = "SPIN"
+        metrics["bowling_type_detail"] = "Lower release point suggests spin bowling"
+    else:
+        metrics["bowling_type"] = "MEDIUM"
+        metrics["bowling_type_detail"] = "Medium pace or all-round action"
+    
+    # ========== EFFICIENCY SCORE ==========
+    score = 50  # Base score
+    
+    # Elbow legality
+    if metrics.get("legality_status") == "LEGAL":
+        score += 20
+    elif metrics.get("legality_status") == "BORDERLINE":
+        score += 10
+    elif metrics.get("legality_status") == "SUSPICIOUS":
+        score -= 10
+    else:
+        score -= 20
+    
+    # Release height
+    if metrics.get("release_position") == "HIGH":
+        score += 15
+    elif metrics.get("release_position") == "SHOULDER_HEIGHT":
+        score += 5
+    
+    # Front arm
+    if metrics.get("front_arm_style") == "EXTENDED":
+        score += 10
+    elif metrics.get("front_arm_style") == "SEMI_BENT":
+        score += 5
+    
+    # Hip-shoulder separation
+    if metrics.get("action_type") == "SIDE_ON":
+        score += 10
+    elif metrics.get("action_type") == "SEMI_OPEN":
+        score += 5
+    
+    # Front leg brace
+    if metrics.get("front_leg_style") == "BRACED":
+        score += 10
+    elif metrics.get("front_leg_style") == "SEMI_BRACED":
+        score += 5
+    
+    score = max(0, min(100, score))
+    
+    if score >= 80:
+        grade = "A"
+        grade_detail = "Excellent bowling mechanics"
+    elif score >= 65:
+        grade = "B"
+        grade_detail = "Good bowling mechanics"
+    elif score >= 50:
+        grade = "C"
+        grade_detail = "Average mechanics - room for improvement"
+    elif score >= 35:
+        grade = "D"
+        grade_detail = "Below average - significant improvements needed"
+    else:
+        grade = "F"
+        grade_detail = "Poor mechanics - major concerns"
+    
+    metrics["efficiency_score"] = int(score)
+    metrics["efficiency_grade"] = grade
+    metrics["efficiency_detail"] = grade_detail
+    metrics["right_handed"] = right_handed
+    metrics["source"] = "MediaPipe 2D"
+    
+    return metrics

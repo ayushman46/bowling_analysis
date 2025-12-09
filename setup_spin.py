@@ -26,7 +26,7 @@ def download_file(url, destination, description="file"):
     
     try:
         urllib.request.urlretrieve(url, destination, progress_hook)
-        print(f"\n✓ {description} downloaded successfully")
+        print(f"\n {description} downloaded successfully")
         return True
     except Exception as e:
         print(f"\n✗ Error downloading {description}: {e}")
@@ -39,7 +39,7 @@ def extract_tarfile(tar_path, destination):
     try:
         with tarfile.open(tar_path, "r:gz") as tar:
             tar.extractall(destination)
-        print("✓ Extraction complete")
+        print(" Extraction complete")
         return True
     except Exception as e:
         print(f"✗ Error extracting: {e}")
@@ -79,7 +79,7 @@ def main():
         if not success:
             return 1
     else:
-        print("✓ Model checkpoint already exists")
+        print(" Model checkpoint already exists")
     
     # Download and extract data files
     mean_params_path = data_dir / "smpl_mean_params.npz"
@@ -101,12 +101,12 @@ def main():
             if success:
                 # Clean up tar file
                 tar_path.unlink()
-                print("✓ SPIN data files ready")
+                print(" SPIN data files ready")
         
         if not success:
             return 1
     else:
-        print("✓ SMPL mean parameters already exist")
+        print(" SMPL mean parameters already exist")
     
     # Check for SMPL models
     print()
@@ -127,7 +127,7 @@ def main():
         model_path = smpl_dir / model_name
         if model_path.exists():
             size_mb = model_path.stat().st_size / 1024 / 1024
-            print(f"✓ {model_name} ({size_mb:.1f} MB)")
+            print(f" {model_name} ({size_mb:.1f} MB)")
         else:
             symbol = "✗" if status == "required" else "⚠"
             print(f"{symbol} {model_name} - {status}")
