@@ -1,0 +1,10 @@
+# SPIN-specific dependencies (compatible versions for modern Python)
+# Note: neural-renderer-pytorch and some other packages are optional for inference
+
+tensorboard
+chumpy
+# scipy==1.0.0  # Too old, using your installed version instead
+# torch==1.1.0  # Too old, using your installed version instead
+# spacepy  # Optional, only needed for H36M dataset preprocessing
+# torchgeometry  # Not needed for inference
+# neural-renderer-pytorch  # Not needed for inference, only for training visualizations

@@ -1,0 +1,15 @@
+streamlit
+opencv-python
+mediapipe
+numpy
+matplotlib
+Pillow
+torch
+torchvision
+trimesh
+pyrender
+tqdm
+smplx
+scikit-image
+scipy
+plotly

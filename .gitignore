@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Streamlit
+.streamlit/
+
+# Results and outputs (session data - can be large)
+results/
+*.mp4
+*.avi
+*.mov
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SPIN data files (large, should be downloaded via script)
+spin_src/data/*.pt
+spin_src/data/*.pth
+spin_src/data/*.npz
+spin_src/data/*.npy
+spin_src/data/*.tar.gz
+spin_src/data/dataset_extras/
+spin_src/data/static_fits/
+
+# SMPL models (keep these but note they're large)
+# spin_src/data/smpl/*.pkl  # Uncomment if you want to exclude these
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# YOLO model files
+yolov8*.pt
+
+# SPIN source (separate repo - clone from https://github.com/nkolot/SPIN)
+spin_src/
