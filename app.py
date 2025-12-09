@@ -684,7 +684,7 @@ def run_3d_analysis(frame_idx: int, pose: Dict):
     
     try:
         spin_model = get_spin_model()
-        progress.progress(20, text="Running SPIN 3D inference with keypoint optimization...")
+        progress.progress(20, text="Running SPIN 3D inference...")
         
         # Use standard SPIN - simple and reliable
         result = spin_model.run(frame_rgb)

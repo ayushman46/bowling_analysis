@@ -263,7 +263,20 @@ class SpinModelWrapper:
             input_tensor = self._preprocess_image(image_rgb)
             pred_rotmat, pred_betas, pred_camera = self.model(input_tensor)
         
+        # SPIN uses SMPL joints with extended joints (49 total)
+        # Indices 0-23 are body joints, 24-48 are extended
+        # SMPL body joint order:
+        # 0: pelvis, 1: left_hip, 2: right_hip, 3: spine1
+        # 4: left_knee, 5: right_knee, 6: spine2, 7: left_ankle
+        # 8: right_ankle, 9: spine3, 10: left_foot, 11: right_foot
+        # 12: neck, 13: left_collar, 14: right_collar, 15: head
+        # 16: left_shoulder, 17: right_shoulder, 18: left_elbow, 19: right_elbow
+        # 20: left_wrist, 21: right_wrist, 22: left_hand, 23: right_hand
+        
         # MediaPipe to SMPL joint mapping
+        # NOTE: MediaPipe "LEFT" is the person's left side as seen from BEHIND
+        # SMPL "left" is also the person's left side
+        # So they should match directly
         mp_to_smpl = {
             "LEFT_HIP": 1, "RIGHT_HIP": 2,
             "LEFT_KNEE": 4, "RIGHT_KNEE": 5,
@@ -271,28 +284,37 @@ class SpinModelWrapper:
             "LEFT_SHOULDER": 16, "RIGHT_SHOULDER": 17,
             "LEFT_ELBOW": 18, "RIGHT_ELBOW": 19,
             "LEFT_WRIST": 20, "RIGHT_WRIST": 21,
+            # Add more joints for better alignment
+            "NOSE": 15,  # Use head joint for nose
         }
         
-        # Collect visible keypoints
+        # Collect visible keypoints with extra weight for arm joints
         target_joints_2d = []
         joint_indices = []
         joint_weights = []
         
+        # Arm joints are critical for bowling action - give them higher weight
+        arm_joints = {"LEFT_SHOULDER", "RIGHT_SHOULDER", "LEFT_ELBOW", "RIGHT_ELBOW", 
+                      "LEFT_WRIST", "RIGHT_WRIST"}
+        
         for mp_name, smpl_idx in mp_to_smpl.items():
             if mp_name in keypoints_2d:
                 x, y, vis = keypoints_2d[mp_name]
-                if vis > 0.3:
+                if vis > 0.2:  # Lower threshold to include more points
                     x_norm = (x / width) * 2 - 1
                     y_norm = (y / height) * 2 - 1
                     target_joints_2d.append([x_norm, y_norm])
                     joint_indices.append(smpl_idx)
-                    joint_weights.append(vis)
+                    
+                    # Extra weight for arm joints (critical for bowling)
+                    weight = vis * 3.0 if mp_name in arm_joints else vis
+                    joint_weights.append(weight)
         
-        if len(target_joints_2d) < 6:
+        if len(target_joints_2d) < 4:
             print("Not enough keypoints, using standard SPIN output")
             return self.run(image_rgb)
         
-        print(f"Refining with {len(target_joints_2d)} keypoints")
+        print(f"Refining with {len(target_joints_2d)} keypoints (arm-weighted)")
         
         target_joints_2d = torch.tensor(target_joints_2d, dtype=torch.float32, device=self.device)
         joint_indices = torch.tensor(joint_indices, dtype=torch.long, device=self.device)
@@ -345,9 +367,9 @@ class SpinModelWrapper:
         init_body_pose = fixed_body_pose.clone()  # For regularization
         
         optimizer2 = torch.optim.Adam([
-            {'params': opt_global_orient, 'lr': 0.005},
-            {'params': opt_camera, 'lr': 0.01},
-            {'params': opt_body_pose, 'lr': 0.005},  # Small LR for pose
+            {'params': opt_global_orient, 'lr': 0.01},
+            {'params': opt_camera, 'lr': 0.02},
+            {'params': opt_body_pose, 'lr': 0.02},  # Higher LR for pose to fix arm positions
         ])
         
         best_loss = float('inf')
@@ -373,11 +395,12 @@ class SpinModelWrapper:
             proj_y = cam_s * selected_joints[:, 1] + cam_ty
             projected_2d = torch.stack([proj_x, proj_y], dim=1)
             
-            # 2D keypoint loss
+            # 2D keypoint loss (weighted - arms have higher weight)
             loss_2d = (joint_weights * (projected_2d - target_joints_2d).pow(2).sum(dim=1)).sum()
             
             # Regularization: stay close to SPIN's body pose prediction
-            reg_loss = 0.1 * (opt_body_pose - init_body_pose).pow(2).mean()
+            # Lower regularization to allow bigger arm adjustments
+            reg_loss = 0.02 * (opt_body_pose - init_body_pose).pow(2).mean()
             
             loss = loss_2d + reg_loss
             loss.backward()
