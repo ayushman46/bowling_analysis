@@ -602,7 +602,7 @@ def main():
         # -------------------------------------------------------------------------
         st.subheader("Step 3: Generate 3D Body Mesh")
         
-        if st.button("🧍 Generate 3D Mesh with SPIN", type="primary"):
+        if st.button(" Generate 3D Mesh with SPIN", type="primary"):
             run_3d_analysis(selected_idx, pose)
     
     # -------------------------------------------------------------------------
@@ -755,7 +755,7 @@ def display_analysis_results():
     # =========================================================================
     # SECTION 1: ACTION LEGALITY (Most Important for Cricket)
     # =========================================================================
-    st.subheader("⚖️ Bowling Action Legality Check")
+    st.subheader(" Bowling Action Legality Check")
     
     legality_status = metrics.get("legality_status", "UNKNOWN")
     legality_color = metrics.get("legality_color", "gray")
@@ -829,9 +829,9 @@ def display_analysis_results():
     # SECTION 3: DETAILED METRICS TABS
     # =========================================================================
     st.subheader("📈 Detailed Analysis")
-    
-    tab1, tab2, tab3, tab4 = st.tabs(["🦾 Bowling Arm", "🧘 Body Position", "🎯 Release Point", "📋 All Metrics"])
-    
+
+    tab1, tab2, tab3, tab4 = st.tabs([" Bowling Arm", " Body Position", " Release Point", " All Metrics"])
+
     with tab1:
         col1, col2, col3 = st.columns(3)
         
@@ -941,7 +941,7 @@ def display_analysis_results():
     # Hip-shoulder separation
     hip_sep = metrics.get("hip_shoulder_separation_deg", 0)
     if hip_sep < 20:
-        insights.append("� **Chest-on action** - Good for spin, may limit pace bowling speed")
+        insights.append(" **Chest-on action** - Good for spin, may limit pace bowling speed")
     elif hip_sep > 45:
         insights.append(" **Strong side-on action** - Good for pace, watch for back stress")
     else:
@@ -959,7 +959,7 @@ def display_analysis_results():
     if front_arm == "HIGH":
         insights.append(" **Front arm high** - Good balance and pull-down potential")
     elif front_arm == "LOW":
-        insights.append("💪 **Front arm pulled down** - Generating body rotation")
+        insights.append(" **Front arm pulled down** - Generating body rotation")
     
     for insight in insights:
         st.markdown(insight)
@@ -969,14 +969,14 @@ def display_analysis_results():
     # =========================================================================
     # SECTION 5: DOWNLOADS
     # =========================================================================
-    st.subheader("📥 Download Results")
+    st.subheader(" Download Results")
     
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         with open(results["mesh_path"], "rb") as f:
             st.download_button(
-                "💾 3D Mesh (.obj)",
+                " 3D Mesh (.obj)",
                 f,
                 file_name="bowling_mesh.obj",
                 mime="text/plain",
@@ -986,7 +986,7 @@ def display_analysis_results():
     with col2:
         with open(results["joints_path"], "rb") as f:
             st.download_button(
-                "💾 3D Joints (.npy)",
+                " 3D Joints (.npy)",
                 f,
                 file_name="joints_3d.npy",
                 mime="application/octet-stream",
@@ -996,7 +996,7 @@ def display_analysis_results():
     with col3:
         with open(results["metrics_path"], "rb") as f:
             st.download_button(
-                "💾 Full Report (.json)",
+                " Full Report (.json)",
                 f,
                 file_name="bowling_analysis.json",
                 mime="application/json",
@@ -1006,7 +1006,7 @@ def display_analysis_results():
     with col4:
         with open(results["frame_path"], "rb") as f:
             st.download_button(
-                "💾 Frame Image (.jpg)",
+                "Frame Image (.jpg)",
                 f,
                 file_name="analysis_frame.jpg",
                 mime="image/jpeg",
