@@ -153,6 +153,39 @@ streamlit run app.py
 
 The app will open in your browser (typically at http://localhost:8501).
 
+## Deploying on Streamlit Cloud
+
+This repo is set up to deploy on Streamlit Cloud.
+
+### Streamlit Cloud settings
+
+- **App entrypoint**: `app.py`
+- **Python runtime**: pinned via `runtime.txt` (currently `python-3.12`)
+- **System packages**: `packages.txt` installs OS libs needed by OpenCV/MediaPipe on Linux
+
+### Why you saw `np.float = np.float_` errors
+
+On Streamlit Cloud you may get a newer Python/NumPy combo (e.g. Python 3.13 + NumPy 2.x).
+NumPy 2.x removes legacy aliases like `np.float`, and accessing older aliases like
+`np.float_` can error in some builds.
+
+This app imports `chumpy_compat` first (see the top of `app.py`) to patch these
+aliases safely.
+
+### Common deployment gotchas
+
+1. **Large model files**: SPIN checkpoints and SMPL files can be too large for the repo.
+  - Keep them out of Git; download at runtime or store in a release bucket.
+  - Make sure the app can start even if the model files are missing (show a friendly error).
+
+2. **MediaPipe wheels**: Streamlit Cloud is Linux; MediaPipe works best when the Python
+  version matches available wheels.
+  - This repo pins **Python 3.12** in `runtime.txt`.
+
+3. **GPU**: Streamlit Cloud is typically CPU-only.
+  - Expect slower inference.
+
+
 ## Usage
 
 1. **Upload Video**: Click "Upload bowling video" and select a cricket bowling video (MP4, MOV, or AVI)

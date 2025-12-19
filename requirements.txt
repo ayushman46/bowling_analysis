@@ -1,15 +1,18 @@
 streamlit
-opencv-python
-mediapipe
-numpy
+opencv-python-headless
+# Mediapipe wheels are most reliable on Streamlit Cloud with Python 3.12.
+mediapipe==0.10.14
+# Keep numpy < 2 to avoid binary compatibility issues with some wheels.
+numpy<2
 matplotlib
 Pillow
 torch
 torchvision
 trimesh
-pyrender
 tqdm
 smplx
 scikit-image
 scipy
 plotly
+ultralytics
+pytest
