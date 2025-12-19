@@ -36,6 +36,23 @@ from src.visualization.render_utils import (
 )
 
 
+def _require_mediapipe():
+    """Import mediapipe with a helpful Streamlit error on missing wheels."""
+    try:
+        import mediapipe as mp  # type: ignore
+        return mp
+    except Exception as e:
+        st.error(
+            "MediaPipe isn't available in this deployment environment.\n\n"
+            "Streamlit Community Cloud may be using a Python version for which your "
+            "pinned MediaPipe version has no wheel.\n\n"
+            "Fix: ensure your `requirements.txt` uses a MediaPipe version that supports "
+            "the Cloud Python version, or pin the Cloud Python version.\n\n"
+            f"Import error: {type(e).__name__}: {e}"
+        )
+        st.stop()
+
+
 # ============================================================================
 # ULTRA HIGH ACCURACY POSE DETECTION (Single Frame)
 # ============================================================================
@@ -51,7 +68,7 @@ def run_ultra_accurate_pose(frame_bgr: np.ndarray) -> Optional[Dict]:
     
     Uses multi-pass refinement for accurate head tracking.
     """
-    import mediapipe as mp
+    mp = _require_mediapipe()
     
     mp_pose = mp.solutions.pose
     

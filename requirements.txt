@@ -1,7 +1,8 @@
 streamlit
 opencv-python-headless
-# Mediapipe wheels are most reliable on Streamlit Cloud with Python 3.12.
-mediapipe==0.10.14
+# MediaPipe: Streamlit Cloud may currently default to Python 3.13.
+# Use a version that publishes cp313 wheels.
+mediapipe>=0.10.30,<0.11
 # Keep numpy < 2 to avoid binary compatibility issues with some wheels.
 numpy<2
 matplotlib
