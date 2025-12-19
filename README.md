@@ -2,6 +2,9 @@
 
 An end-to-end application that analyzes cricket bowling videos using MediaPipe Pose and SPIN 3D reconstruction to compute biomechanics metrics.
 
+https://github.com/user-attachments/assets/f42b3085-9729-4a9f-89a0-b15c0b9e4773
+https://github.com/user-attachments/assets/3811fcb9-3381-41cd-8001-7b838b5feda2
+
 ## Features
 
 - **Video Processing**: Upload bowling videos via Streamlit interface
