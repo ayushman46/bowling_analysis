@@ -445,10 +445,10 @@ def main():
     st.title(" Cricket Bowling 3D Analysis (High Accuracy Mode)")
     st.markdown("""
     **New Frame-First Workflow for Maximum Accuracy:**
-    1. 📹 Upload video → frames are extracted
-    2. 🎯 **You select the exact frame** you want to analyze
+    1.  Upload video → frames are extracted
+    2.  **You select the exact frame** you want to analyze
     3.  Run **ULTRA-HIGH-ACCURACY** pose detection on that one frame
-    4. 🧍 Generate precise 3D body mesh
+    4.  Generate precise 3D body mesh
     5.  View metrics and download results
     """)
     
@@ -458,7 +458,7 @@ def main():
     # VIDEO UPLOAD
     # -------------------------------------------------------------------------
     uploaded_file = st.file_uploader(
-        "📹 Upload bowling video",
+        "Upload bowling video",
         type=["mp4", "mov", "avi", "mkv"],
         help="Upload a video of a cricket bowling delivery",
     )
@@ -509,7 +509,7 @@ def main():
     # FRAME SELECTION UI (Step 1)
     # -------------------------------------------------------------------------
     st.subheader("Step 1: Select the Frame to Analyze")
-    st.info("👆 Browse through frames and select the one showing the bowling action you want to analyze (e.g., ball release moment)")
+    st.info(" Browse through frames and select the one showing the bowling action you want to analyze (e.g., ball release moment)")
     
     col1, col2 = st.columns([3, 1])
     
@@ -684,13 +684,21 @@ def run_3d_analysis(frame_idx: int, pose: Dict):
     
     try:
         spin_model = get_spin_model()
-        progress.progress(20, text="Running SPIN 3D inference...")
+        progress.progress(20, text="Running SPIN 3D inference with pose correction...")
         
-        # Use standard SPIN - simple and reliable
-        result = spin_model.run(frame_rgb)
+        # Use SPIN with pose correction to match MediaPipe knee positions
+        result = spin_model.run_with_pose_correction(frame_rgb, adjusted_pose)
         
-        if result.get("optimization_applied"):
-            st.success("Applied 2D keypoint optimization to align 3D mesh with detected pose")
+        if result.get("knee_correction_applied"):
+            left_angle = result.get("left_knee_angle")
+            right_angle = result.get("right_knee_angle")
+            angle_info = []
+            if left_angle:
+                angle_info.append(f"Left: {left_angle:.0f} deg")
+            if right_angle:
+                angle_info.append(f"Right: {right_angle:.0f} deg")
+            if angle_info:
+                st.info(f"Applied knee correction based on MediaPipe detection ({', '.join(angle_info)})")
         
         vertices = result["vertices"]
         faces = result["faces"]

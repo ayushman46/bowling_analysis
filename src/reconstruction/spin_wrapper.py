@@ -233,6 +233,138 @@ class SpinModelWrapper:
         }
         return result
 
+    def run_with_pose_correction(
+        self, 
+        image_rgb: np.ndarray, 
+        keypoints_2d: Dict[str, tuple]
+    ) -> Dict[str, Any]:
+        """
+        Run SPIN and then correct the pose (especially knees) to match MediaPipe detection.
+        
+        This method:
+        1. Runs standard SPIN inference
+        2. Calculates knee bend angles from MediaPipe 2D keypoints
+        3. Applies knee rotation corrections to the SMPL model
+        4. Regenerates the mesh with corrected pose
+        
+        Args:
+            image_rgb: RGB image as numpy array (H, W, 3)
+            keypoints_2d: Dict mapping landmark names to (x, y, visibility)
+            
+        Returns:
+            Dictionary containing corrected vertices, faces, joints, and params
+        """
+        if self.model is None or self.smpl is None:
+            raise RuntimeError("SPIN model is not initialized.")
+        
+        height, width = image_rgb.shape[:2]
+        
+        # First, run standard SPIN
+        with torch.no_grad():
+            input_tensor = self._preprocess_image(image_rgb)
+            pred_rotmat, pred_betas, pred_camera = self.model(input_tensor)
+        
+        # Calculate knee angles from MediaPipe 2D keypoints
+        def get_2d_angle(p1, p2, p3):
+            """Calculate angle at p2 formed by p1-p2-p3."""
+            if p1 is None or p2 is None or p3 is None:
+                return None
+            v1 = np.array([p1[0] - p2[0], p1[1] - p2[1]])
+            v2 = np.array([p3[0] - p2[0], p3[1] - p2[1]])
+            v1_norm = v1 / (np.linalg.norm(v1) + 1e-8)
+            v2_norm = v2 / (np.linalg.norm(v2) + 1e-8)
+            dot = np.clip(np.dot(v1_norm, v2_norm), -1.0, 1.0)
+            return np.degrees(np.arccos(dot))
+        
+        def get_point(name):
+            if name in keypoints_2d:
+                x, y, vis = keypoints_2d[name]
+                if vis > 0.3:
+                    return (x, y)
+            return None
+        
+        # Get knee angles from MediaPipe
+        left_hip = get_point("LEFT_HIP")
+        left_knee = get_point("LEFT_KNEE")
+        left_ankle = get_point("LEFT_ANKLE")
+        right_hip = get_point("RIGHT_HIP")
+        right_knee = get_point("RIGHT_KNEE")
+        right_ankle = get_point("RIGHT_ANKLE")
+        
+        left_knee_angle = get_2d_angle(left_hip, left_knee, left_ankle)
+        right_knee_angle = get_2d_angle(right_hip, right_knee, right_ankle)
+        
+        print(f"MediaPipe knee angles - Left: {left_knee_angle:.1f} deg, Right: {right_knee_angle:.1f} deg" 
+              if left_knee_angle and right_knee_angle else "Could not detect knee angles")
+        
+        # SMPL joint indices for knees:
+        # Body pose is 23 joints (excluding root), each with 3x3 rotation matrix
+        # Joint order: 0=pelvis(root), 1=left_hip, 2=right_hip, 3=spine1,
+        # 4=left_knee, 5=right_knee, 6=spine2, 7=left_ankle, 8=right_ankle, ...
+        # So in body_pose (without root): left_knee=3, right_knee=4
+        LEFT_KNEE_IDX = 3   # Index in body_pose (0-indexed, after root)
+        RIGHT_KNEE_IDX = 4
+        
+        # Clone the rotation matrices for modification
+        corrected_rotmat = pred_rotmat.clone()
+        
+        def create_knee_rotation(angle_deg, axis='x'):
+            """Create a rotation matrix for knee bend around X axis."""
+            # Knee bends around the X axis (medial-lateral axis)
+            # A straight leg is 180 degrees, so the bend amount is (180 - angle)
+            bend_rad = np.radians(180.0 - angle_deg)
+            
+            c, s = np.cos(bend_rad), np.sin(bend_rad)
+            if axis == 'x':
+                rot = np.array([
+                    [1, 0, 0],
+                    [0, c, -s],
+                    [0, s, c]
+                ], dtype=np.float32)
+            return torch.tensor(rot, device=self.device, dtype=torch.float32)
+        
+        # Apply knee corrections if we have valid angles
+        if left_knee_angle is not None and left_knee_angle < 170:
+            # Significant knee bend detected
+            new_rot = create_knee_rotation(left_knee_angle)
+            corrected_rotmat[0, LEFT_KNEE_IDX + 1] = new_rot  # +1 because index 0 is global orient
+            print(f"Applied left knee correction: {180 - left_knee_angle:.1f} deg bend")
+        
+        if right_knee_angle is not None and right_knee_angle < 170:
+            # Significant knee bend detected
+            new_rot = create_knee_rotation(right_knee_angle)
+            corrected_rotmat[0, RIGHT_KNEE_IDX + 1] = new_rot  # +1 because index 0 is global orient
+            print(f"Applied right knee correction: {180 - right_knee_angle:.1f} deg bend")
+        
+        # Regenerate mesh with corrected pose
+        with torch.no_grad():
+            smpl_output = self.smpl(
+                betas=pred_betas,
+                body_pose=corrected_rotmat[:, 1:],
+                global_orient=corrected_rotmat[:, 0].unsqueeze(1),
+                pose2rot=False
+            )
+            
+            vertices = smpl_output.vertices[0].cpu().numpy()
+            joints_3d = smpl_output.joints[0].cpu().numpy()
+        
+        smpl_params = {
+            "betas": pred_betas[0].cpu().numpy(),
+            "rotmat": corrected_rotmat[0].cpu().numpy(),
+            "camera": pred_camera[0].cpu().numpy(),
+        }
+        
+        result = {
+            "vertices": vertices,
+            "faces": self.faces,
+            "joints_3d": joints_3d,
+            "smpl_params": smpl_params,
+            "knee_correction_applied": True,
+            "left_knee_angle": left_knee_angle,
+            "right_knee_angle": right_knee_angle,
+        }
+        return result
+
     def run_with_keypoints(
         self, 
         image_rgb: np.ndarray, 
